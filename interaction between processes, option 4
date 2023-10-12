@@ -1,0 +1,60 @@
+#include <iostream>
+#include <fstream>
+#include "sys/wait.h"
+using namespace std;
+
+int main() {
+    ifstream in("input");
+    ofstream out("output");
+    if(!in) cout << "in error" << endl;
+    if(!out) cout << "out error" << endl;
+
+    int pipe_dt[2];
+    int err = pipe(pipe_dt);
+    if(err == -1) { cout << "pipe error" << endl; return -1; }
+
+    pid_t pid = fork();
+    if(pid == -1) { cout << "fork error" << endl; return -1;}
+
+    if(pid == 0) {
+        cout << "I am child process" << endl;
+        close(pipe_dt[1]); // закрыть запись
+
+        int sz;
+        float wal, a;
+        read(pipe_dt[0], &sz, sizeof(sz)); // принять размер
+        read(pipe_dt[0], &wal, sizeof(wal)); // принять первое значение
+        for(int i = 1 ;i < sz ; ++i)  {    
+            read(pipe_dt[0], &a, sizeof(a)); // принять остальные значения
+            if(a == 0) {
+                close(pipe_dt[0]);
+                cout << "zero error" << endl;
+                return -1;
+            }
+            wal /= a;
+        }
+        out << wal << endl;
+        close(pipe_dt[0]); // закрыть чтение
+        cout << "child finish" << endl;
+
+    } else {
+        cout << "I am parent process" << endl;
+        close(pipe_dt[0]); // закрыть чтение
+        int sz;
+        float a;
+        in >> sz; 
+        write(pipe_dt[1], &sz, sizeof(sz)); // послать в поток размер
+        for(int i = 0 ; i < sz; ++i) {
+            in >> a;
+            write(pipe_dt[1], &a, sizeof(a)); // послать в поток значения
+        }
+
+        close(pipe_dt[1]); // закрыть запись
+        cout << "parent wait" << endl;
+        wait(NULL);
+        cout << "parent finished" << endl;
+    }
+    in.close();
+    out.close();
+    return 0;
+}
